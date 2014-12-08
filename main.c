@@ -266,17 +266,15 @@ void compress_free_block()
 
 	while (head->next != NULL){
 		rear = head->next;
-		while (rear != NULL){
+		if (rear != NULL){
 			if (head->start_addr + head->size == rear->start_addr){ 
 				//空闲分区地址间的连续
 				head->size += rear->size;
 				head->next = rear->next;
-
+				
 				free(rear);
-
 				continue;
 			}
-			rear = rear->next;
 		}
 
 		head = head->next;
@@ -310,11 +308,11 @@ int allocate_mem(struct allocated_block *ab)
 				
 				return 1;
 			} else if ((fbt->size - request_size < MIN_SLICE) 
-						&& (fbt->size > request_size)){
+						&& (fbt->size >= request_size)){
 				///存在一个空闲分区，但是分配后的剩余空间小于MIN_SLICE，则一起分配
 				//将剩余的一小部分也分给当前进程所申请的空间
 				mem_size -= fbt->size;
-				//指针指向下一个练习的空间
+				//指针指向下一个联系的空间
 				pre = fbt->next;
 				ab->start_addr = fbt->start_addr;
 				fbt->start_addr += fbt->size;
@@ -395,14 +393,30 @@ int free_mem(struct allocated_block *ab)
 	fbt->size = ab->size;
 	fbt->start_addr = ab->start_addr;
 
+
+	///将准备释放的节点插入到空闲链表的尾部
+	pre = work = free_block;
+	if (free_block == NULL){
+		free_block = fbt;
+		free_block->next = NULL;
+	} else {
+		while (pre->next != NULL){
+			pre = pre->next;
+		}
+		fbt->next = pre->next;
+		pre->next = fbt;
+	}
+
+
+	///值得优化的部分
 	//将准备释放的节点插入到空闲链表的首部
-	fbt->next = free_block;
-	free_block = fbt;
+//	fbt->next = free_block;
+//	free_block = fbt;
 	rearrange(algorithm);
-
-	compress_free_block();
-
-	rearrange(algorithm);
+	if(free_block->next){
+		compress_free_block();
+		rearrange(algorithm);
+	}
 	return 1;
 }
 
@@ -444,6 +458,11 @@ int display_mem_usage()
 	printf("Free Memory:\n");
 	printf("%20s %20s\n", "    start_addr", "    size");
 
+	//当空闲分区size = 0时，释放空闲分区
+	if (fbt->size == 0){
+		fbt = NULL;
+		free_block = NULL;
+	}
 	while(fbt != NULL){
 		printf("%20d %20d\n", fbt->start_addr, fbt->size);
 		fbt = fbt->next;
@@ -464,31 +483,33 @@ int display_mem_usage()
 
 int main(int argc, char **argv)
 {
-	char choice;
+	int choice;
 	pid = 0;
 	free_block = init_free_block(mem_size);
 	
 	while (1){
 
 		display_menu();  //显示菜单
-		fflush(stdin);
-		choice = getchar(); //获取用户信息
+//		fflush(stdin);
+//		choice = getchar(); //获取用户信息
+		printf("请选择:");
+		scanf("%d", &choice);
 		switch(choice){
-			case '1':set_mem_size();   //设置内存大小
+			case 1:set_mem_size();   //设置内存大小
 			break;
-			case '2':set_algorithm();
+			case 2:set_algorithm();
 				 flag = 1;         //设置算法
 			break;
-			case '3':new_process();
+			case 3:new_process();
 				 flag = 1;      //创建新的进程
 			break;
-			case '4':kill_process();
+			case 4:kill_process();
 				 flag = 1;      //删除进程
 			break;
-			case '5':display_mem_usage();
+			case 5:display_mem_usage();
 				 flag = 1;	//显示内存使用
 			break;
-			case '0'://do_exit();
+			case 0://do_exit();
 				 exit(0);          //释放链表并退出
 			default: break;
 		}
